@@ -6,8 +6,13 @@
 [![AI: Gemini Pro](https://img.shields.io/badge/AI-Gemini%20Pro-purple)](https://deepmind.google/technologies/gemini/)
 
 ## 🚀 Live Demo & Video
-- **Live App:** [https://pharmaguard-demo.vercel.app](https://pharmaguard-demo.vercel.app) *(Replace with actual link)*
-- **Demo Video:** [LinkedIn / YouTube Link Here](https://linkedin.com) *(Replace with actual link)*
+- **Live App:** [[https://pharmaguard-demo.vercel.app](https://pharmaguard-demo.vercel.app)](https://pharmaguard-udj2.vercel.app/) *(Replace with actual link)*
+- **Demo Video:** [[LinkedIn / YouTube Link Here]](https://www.linkedin.com/posts/sudeepshm_rift2026-pharmaguard-pharmacogenomics-ugcPost-7430407699000983552-K83N?utm_source=share&utm_medium=member_android&rcm=ACoAAFQ9qhoBtMsVln-CniMk0uFUKGr30_zmGVk)(https://linkedin.com) *(Replace with actual link)*
+team name:runvia
+TEAM MEMEBERS:SUDEEP H M
+SIDDARTHA r s
+shreyas P R
+
 
 ---
 
