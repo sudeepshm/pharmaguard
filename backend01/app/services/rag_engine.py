@@ -245,18 +245,25 @@ class PineconeKnowledgeBase:
     def initialize(self) -> bool:
         """Try to connect to Pinecone. Returns True if successful."""
         try:
-            from pinecone import Pinecone
+            import pinecone
             import google.generativeai as genai
+            from app.config import get_settings
+
+            settings = get_settings()
 
             genai.configure(api_key=self.gemini_api_key)
             self._model = genai
 
-            pc = Pinecone(api_key=self.pinecone_api_key)
+            # Pinecone v3 / legacy init
+            pinecone.init(
+                api_key=self.pinecone_api_key,
+                environment=settings.PINECONE_ENV
+            )
 
             # Check if index exists
-            existing = [idx.name for idx in pc.list_indexes()]
+            existing = pinecone.list_indexes()
             if self.index_name in existing:
-                self._index = pc.Index(self.index_name)
+                self._index = pinecone.Index(self.index_name)
                 self._available = True
                 logger.info("Pinecone connected: index=%s", self.index_name)
             else:

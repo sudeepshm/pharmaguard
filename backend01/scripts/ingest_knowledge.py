@@ -48,26 +48,26 @@ def main():
     print("Gemini configured for embedding generation.")
 
     # ── Setup Pinecone ───────────────────────────────────────
-    from pinecone import Pinecone, ServerlessSpec
+    import pinecone
 
-    pc = Pinecone(api_key=pinecone_key)
+    env = os.getenv("PINECONE_ENV", "us-east-1")
+    pinecone.init(api_key=pinecone_key, environment=env)
 
     # Create index if it doesn't exist
-    existing = [idx.name for idx in pc.list_indexes()]
+    existing = pinecone.list_indexes()
     if index_name not in existing:
         print(f"Creating Pinecone index: {index_name}")
-        pc.create_index(
+        pinecone.create_index(
             name=index_name,
             dimension=768,  # Gemini embedding-001 output dimension
-            metric="cosine",
-            spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+            metric="cosine"
         )
         # Wait for index to be ready
         time.sleep(10)
     else:
         print(f"Pinecone index '{index_name}' already exists.")
 
-    index = pc.Index(index_name)
+    index = pinecone.Index(index_name)
 
     # ── Generate embeddings and upsert ───────────────────────
     vectors = []

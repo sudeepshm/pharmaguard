@@ -16,6 +16,7 @@ class Settings:
     # ── API Keys ──────────────────────────────────────────────
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
+    PINECONE_ENV: str = os.getenv("PINECONE_ENV", "us-east-1")
     PINECONE_INDEX: str = os.getenv("PINECONE_INDEX", "pharmaguard-pgx")
 
     # ── App ───────────────────────────────────────────────────
