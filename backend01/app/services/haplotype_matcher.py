@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -44,6 +45,15 @@ def _load_definitions() -> Dict:
     return _DEFINITIONS
 
 
+# ── Zygosity enum ─────────────────────────────────────────────────────
+
+class Zygosity(str, Enum):
+    """Genotype zygosity as determined from VCF GT field."""
+    NONE = "none"   # 0/0 — wildtype both alleles
+    HET  = "het"    # 0/1 — heterozygous
+    HOM  = "hom"    # 1/1 — homozygous alt
+
+
 # ── Data classes ──────────────────────────────────────────────────────
 
 @dataclass
@@ -54,6 +64,7 @@ class AlleleCall:
     function: str           # e.g. "No function"
     matched_variants: int   # how many defining variants matched
     total_defining: int     # total defining variants for this allele
+    is_homozygous: bool = False  # True if ALL defining variants are GT=1/1
 
 
 @dataclass
@@ -157,7 +168,7 @@ def _assign_diplotype(
         if rsid:
             patient_variants[rsid] = v
 
-    # Score each star allele
+    # Score each star allele, tracking per-variant zygosity
     allele_scores: List[Tuple[str, AlleleCall]] = []
 
     for allele_name, allele_info in alleles_def.items():
@@ -173,12 +184,16 @@ def _assign_diplotype(
                     function=allele_info.get("name", ""),
                     matched_variants=0,
                     total_defining=0,
+                    is_homozygous=False,
                 ),
             ))
             continue
 
-        # Count matches
+        # Count matches and track zygosity per defining variant
         matched = 0
+        all_hom = True   # assume hom until proven otherwise
+        any_matched = False
+
         for dv in defining:
             rsid = dv.get("rsid", "")
             expected_alt = dv.get("alt", "")
@@ -188,14 +203,24 @@ def _assign_diplotype(
                 gt = pv.get("genotype", "")
                 pv_alt = pv.get("alt", "")
 
-                # Check if patient carries the alt allele
-                has_alt = _genotype_has_alt(gt, pv_alt, expected_alt)
-                if has_alt:
+                # Determine zygosity for this variant
+                zyg = _genotype_zygosity(gt, pv_alt, expected_alt)
+
+                if zyg != Zygosity.NONE:
                     matched += 1
+                    any_matched = True
                     if rsid not in matched_rsids:
                         matched_rsids.append(rsid)
+                    # Track if ALL matched defining variants are HOM
+                    if zyg != Zygosity.HOM:
+                        all_hom = False
+                else:
+                    all_hom = False  # unmatched defining variant → not hom
+            else:
+                all_hom = False  # missing defining variant → not hom
 
-        if matched > 0:
+        if matched == len(defining):
+            # FULL MATCH: all defining variants present in VCF → valid allele call
             allele_scores.append((
                 allele_name,
                 AlleleCall(
@@ -204,8 +229,17 @@ def _assign_diplotype(
                     function=allele_info.get("name", ""),
                     matched_variants=matched,
                     total_defining=len(defining),
+                    is_homozygous=(all_hom and matched == len(defining)),
                 ),
             ))
+        elif matched > 0:
+            # PARTIAL MATCH: some but not all defining variants present
+            # → DO NOT call this allele. Log for transparency.
+            logger.info(
+                "%s: Skipping %s — partial match (%d/%d defining variants). "
+                "All defining variants must be present in VCF to call an allele.",
+                gene, allele_name, matched, len(defining),
+            )
 
     # Sort by: full matches first (matched == total), then by match count desc
     allele_scores.sort(
@@ -237,21 +271,29 @@ def _assign_diplotype(
             function=wt_info.get("name", "Normal function"),
             matched_variants=0,
             total_defining=0,
+            is_homozygous=False,
         )
 
-    # Determine allele pair
+    # Determine allele pair using zygosity tracked during scoring
     if not variant_alleles:
-        # Homozygous wild-type
+        # No variant alleles matched → homozygous wild-type (GT=0/0 for all loci)
         allele1 = wildtype
         allele2 = AlleleCall(**{**wildtype.__dict__})
     elif len(variant_alleles) == 1:
         va = variant_alleles[0]
-        # Check if homozygous for this variant allele
-        is_hom = _is_homozygous_for_allele(va, variants, alleles_def)
-        if is_hom:
+        if va.is_homozygous:
+            # GT=1/1 for ALL defining variants → homozygous alt
+            # e.g. rs4244285 GT=1/1 → *2/*2 (NOT *1/*2)
             allele1 = va
             allele2 = AlleleCall(**{**va.__dict__})
+            logger.info(
+                "%s: GT=1/1 detected → homozygous %s/%s (activity=%.1f+%.1f=%.1f)",
+                gene, va.allele_name, va.allele_name,
+                va.activity_score, va.activity_score,
+                va.activity_score * 2,
+            )
         else:
+            # GT=0/1 → heterozygous → one wildtype + one variant allele
             allele1 = wildtype
             allele2 = va
     else:
@@ -283,45 +325,49 @@ def _assign_diplotype(
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
-def _genotype_has_alt(genotype: str, vcf_alt: str, expected_alt: str) -> bool:
+def _genotype_zygosity(genotype: str, vcf_alt: str, expected_alt: str) -> Zygosity:
     """
-    Check if a genotype string indicates the patient carries the alt allele.
-    Genotype formats: "0/1", "1/1", "0|1", etc.
+    Determine the zygosity of a genotype for a given alt allele.
+
+    VCF GT field semantics:
+      - 0/0 → wildtype both alleles → Zygosity.NONE
+      - 0/1 or 1/0 → heterozygous   → Zygosity.HET
+      - 1/1         → homozygous alt → Zygosity.HOM
+
+    This is CRITICAL for correct diplotype assignment:
+      GT=0/1 → *1/*variant (het)     → e.g. *1/*2 → IM
+      GT=1/1 → *variant/*variant (hom) → e.g. *2/*2 → PM
     """
-    if not genotype or genotype == ".":
-        return False
+    if not genotype or genotype == "." or genotype == "./.":
+        return Zygosity.NONE
 
     sep = "|" if "|" in genotype else "/"
-    alleles = genotype.split(sep)
+    gt_alleles = genotype.split(sep)
 
-    # If any allele is non-ref (not "0"), patient has alt
-    return any(a != "0" and a != "." for a in alleles)
+    if len(gt_alleles) != 2:
+        return Zygosity.NONE
+
+    a1, a2 = gt_alleles
+
+    # Count how many alleles are non-reference
+    is_alt_1 = (a1 != "0" and a1 != ".")
+    is_alt_2 = (a2 != "0" and a2 != ".")
+
+    if is_alt_1 and is_alt_2:
+        # 1/1 or 1/2 — both alleles carry a variant
+        return Zygosity.HOM
+    elif is_alt_1 or is_alt_2:
+        # 0/1 or 1/0 — one allele is reference
+        return Zygosity.HET
+    else:
+        # 0/0 — wildtype
+        return Zygosity.NONE
 
 
-def _is_homozygous_for_allele(
-    allele_call: AlleleCall,
-    variants: List[dict],
-    alleles_def: dict,
-) -> bool:
-    """Check if the patient is homozygous for a variant allele's defining variants."""
-    allele_info = alleles_def.get(allele_call.allele_name, {})
-    defining = allele_info.get("defining_variants", [])
-
-    if not defining:
-        return False
-
-    patient_index = {v.get("rsid", ""): v for v in variants}
-
-    for dv in defining:
-        rsid = dv.get("rsid", "")
-        pv = patient_index.get(rsid)
-        if not pv:
-            return False
-        gt = pv.get("genotype", "")
-        if not _is_homozygous_gt(gt):
-            return False
-
-    return True
+# Keep legacy helpers for backward compatibility
+def _genotype_has_alt(genotype: str, vcf_alt: str, expected_alt: str) -> bool:
+    """Check if a genotype carries the alt allele (het OR hom)."""
+    return _genotype_zygosity(genotype, vcf_alt, expected_alt) != Zygosity.NONE
 
 
 def _is_homozygous_gt(genotype: str) -> bool:

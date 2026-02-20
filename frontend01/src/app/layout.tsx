@@ -15,8 +15,8 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PharmaGuard — Pharmacogenomics Analysis",
-  description: "AI-powered pharmacogenomics clinical decision support system. Upload VCF data, analyze drug-gene interactions, and receive personalized risk assessments.",
+  title: "PharmaGuard — Clinical Pharmacogenomics",
+  description: "Enterprise pharmacogenomics clinical decision support. Analyze drug-gene interactions with CPIC guidelines and AI-powered risk assessments.",
 };
 
 export default function RootLayout({

@@ -18,6 +18,7 @@ from app.models.schemas import (
     RiskAssessment,
     PharmacogenomicProfile,
     DetectedVariant,
+    ClinicalRecommendation,
     LLMExplanation,
     QualityMetrics,
 )
@@ -183,18 +184,69 @@ async def analyze(
         primary_gene = primary_rec.gene if primary_rec and primary_rec.gene != "N/A" else "N/A"
         diplotype_result = haplo_result.gene_results.get(primary_gene)
 
-        # Build pharmacogenomic profile
+        # ── Effect resolution helpers ──────────────────────
+        # Filter variants to the primary gene
+        if primary_gene != "N/A":
+            gene_variants = [
+                v for v in parse_result.pharmacogene_variants
+                if v.gene == primary_gene
+            ]
+        else:
+            gene_variants = list(parse_result.pharmacogene_variants)
+
+        # Map allele function names to standardised labels
+        _EFFECT_MAP = {
+            "no function": "No Function",
+            "loss of function": "No Function",
+            "reduced function": "Reduced Function",
+            "decreased function": "Decreased Function",
+            "normal function": "Normal Function",
+            "increased function": "Increased Function",
+        }
+
+        def _resolve_effect(gt: str) -> str:
+            """Derive human-readable effect from genotype + haplotype allele."""
+            if not gt or gt in (".", "./."):
+                return "Normal Function"
+            norm = gt.replace("|", "/")
+            parts = norm.split("/")
+            if all(p == "0" for p in parts):
+                return "Normal Function"
+            # Has alt allele → use the non-wildtype allele's function
+            if diplotype_result:
+                func = (diplotype_result.allele2.function
+                        if diplotype_result.allele2
+                        else (diplotype_result.allele1.function if diplotype_result.allele1 else ""))
+                if func:
+                    return _EFFECT_MAP.get(func.lower().strip(), func.title())
+            # Fallback based on zygosity
+            if all(p != "0" for p in parts):
+                return "No Function"
+            return "Reduced Function"
+
+        detected = [
+            DetectedVariant(
+                rsid=v.rsid,
+                genotype=v.genotype,
+                effect=_resolve_effect(v.genotype or ""),
+            )
+            for v in gene_variants
+        ]
+
+        # Build pharmacogenomic profile (with detected_variants nested inside)
         if diplotype_result:
             pgx_profile = PharmacogenomicProfile(
                 primary_gene=primary_gene,
                 diplotype=diplotype_result.diplotype,
-                phenotype=f"{diplotype_result.phenotype} ({diplotype_result.phenotype_label})",
+                phenotype=diplotype_result.phenotype,  # Just code: PM, IM, NM, RM, URM
+                detected_variants=detected,
             )
         else:
             pgx_profile = PharmacogenomicProfile(
                 primary_gene=primary_gene,
                 diplotype="N/A",
-                phenotype="N/A",
+                phenotype="Unknown",
+                detected_variants=detected,
             )
 
         # Build risk assessment
@@ -208,27 +260,31 @@ async def analyze(
             risk = RiskAssessment(
                 risk_label="Unknown",
                 confidence_score=0.3,
-                severity="low",
+                severity="none",
             )
 
-        # Build detected variants (filtered to primary gene)
-        if primary_gene != "N/A":
-            gene_variants = [
-                v for v in parse_result.pharmacogene_variants
-                if v.gene == primary_gene
-            ]
+        # Build clinical recommendation object
+        _CPIC_YEARS = {
+            "CYP2D6": "2020", "CYP2C19": "2022", "CYP2C9": "2017",
+            "SLCO1B1": "2022", "TPMT": "2019", "DPYD": "2023",
+            "CYP3A5": "2022",
+        }
+        cpic_year = _CPIC_YEARS.get(primary_gene, "")
+
+        if primary_rec:
+            clin_rec = ClinicalRecommendation(
+                recommendation=primary_rec.recommendation,
+                dosing_guidance=None,
+                cpic_guideline=f"CPIC Guideline: {primary_gene} ({cpic_year})" if cpic_year else f"CPIC Guideline: {primary_gene}",
+                cpic_level="A" if primary_rec.found else None,
+            )
         else:
-            gene_variants = list(parse_result.pharmacogene_variants)
-
-        detected = [
-            DetectedVariant(
-                rsid=v.rsid,
-                genotype=v.genotype,
-                allelic_depth=v.allelic_depth,
-                clinical_recommendation=primary_rec.recommendation if primary_rec else "No specific recommendation.",
+            clin_rec = ClinicalRecommendation(
+                recommendation="No CPIC guideline found. Standard dosing may be appropriate — consult clinical pharmacist.",
+                dosing_guidance=None,
+                cpic_guideline=None,
+                cpic_level=None,
             )
-            for v in gene_variants
-        ]
 
         # ── 6a. RAG context retrieval (Module 5) ─────────────
         try:
@@ -277,20 +333,18 @@ async def analyze(
         # ── 7. Assemble result ────────────────────────────────
         results.append(
             DrugAnalysisResult(
-                **{
-                    "patient id": patient_id,
-                    "drug": drug,
-                    "timestamp": datetime.now(timezone.utc),
-                    "risk_assessment": risk,
-                    "pharmacogenomic_profile": pgx_profile,
-                    "detected_variants": detected,
-                    "llm_generated_explanation": explanation,
-                    "quality_metrics": QualityMetrics(
-                        vcf_parsing_success=True,
-                        total_variants_extracted=parse_result.total_variants,
-                        pharmacogenes_found=len(parse_result.genes_found),
-                    ),
-                }
+                patient_id=patient_id,
+                drug=drug,
+                timestamp=datetime.now(timezone.utc),
+                risk_assessment=risk,
+                pharmacogenomic_profile=pgx_profile,
+                clinical_recommendation=clin_rec,
+                llm_generated_explanation=explanation,
+                quality_metrics=QualityMetrics(
+                    vcf_parsing_success=True,
+                    total_variants_extracted=parse_result.total_variants,
+                    pharmacogenes_found=len(parse_result.genes_found),
+                ),
             )
         )
 

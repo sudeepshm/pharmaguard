@@ -19,7 +19,7 @@
         "gene": "CYP2D6",
         "phenotype": "IM",
         "drug": "CODEINE",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "moderate",
         "recommendation": "Use codeine with caution at reduced dose. Intermediate metabolism may reduce analgesic efficacy. Consider alternative analgesics if inadequate response."
     },
@@ -51,7 +51,7 @@
         "gene": "CYP2D6",
         "phenotype": "IM",
         "drug": "TRAMADOL",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "moderate",
         "recommendation": "Consider reduced dose or alternative analgesic due to decreased O-desmethyltramadol formation."
     },
@@ -115,7 +115,7 @@
         "gene": "CYP2D6",
         "phenotype": "IM",
         "drug": "TAMOXIFEN",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "moderate",
         "recommendation": "Consider higher dose tamoxifen (40mg) or alternative therapy (aromatase inhibitor). Reduced endoxifen formation expected."
     },
@@ -155,7 +155,7 @@
         "gene": "CYP2C19",
         "phenotype": "IM",
         "drug": "CLOPIDOGREL",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "high",
         "recommendation": "Reduced formation of active metabolite. Consider prasugrel or ticagrelor as alternative antiplatelet therapy if no contraindications."
     },
@@ -164,8 +164,8 @@
         "phenotype": "PM",
         "drug": "CLOPIDOGREL",
         "risk_label": "Ineffective",
-        "severity": "critical",
-        "recommendation": "AVOID clopidogrel. PM patients have markedly reduced active metabolite and diminished antiplatelet response. Use prasugrel or ticagrelor."
+        "severity": "high",
+        "recommendation": "Avoid clopidogrel. Consider alternative antiplatelet therapy (prasugrel or ticagrelor). CYP2C19 poor metabolizers have markedly reduced formation of the active metabolite, resulting in diminished antiplatelet response and increased risk of adverse cardiovascular events including stent thrombosis. CPIC Level A."
     },
     {
         "gene": "CYP2C19",
@@ -179,7 +179,7 @@
         "gene": "CYP2C19",
         "phenotype": "RM",
         "drug": "OMEPRAZOLE",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "moderate",
         "recommendation": "Consider increased dose for H. pylori eradication or erosive esophagitis."
     },
@@ -203,7 +203,7 @@
         "gene": "CYP2C19",
         "phenotype": "PM",
         "drug": "OMEPRAZOLE",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "moderate",
         "recommendation": "Consider 50% dose reduction. PM patients have markedly increased omeprazole exposure. Monitor for adverse effects."
     },
@@ -227,7 +227,7 @@
         "gene": "CYP2C19",
         "phenotype": "IM",
         "drug": "VORICONAZOLE",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "moderate",
         "recommendation": "Standard dosing but higher trough levels expected. Monitor for toxicity."
     },
@@ -251,7 +251,7 @@
         "gene": "CYP2C9",
         "phenotype": "IM",
         "drug": "WARFARIN",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "high",
         "recommendation": "Reduce warfarin starting dose by 25-50%. IM patients have decreased warfarin clearance and increased bleeding risk. Monitor INR closely."
     },
@@ -275,7 +275,7 @@
         "gene": "CYP2C9",
         "phenotype": "IM",
         "drug": "PHENYTOIN",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "high",
         "recommendation": "Reduce phenytoin dose by 25%. IM patients metabolize phenytoin more slowly, increasing toxicity risk. Monitor levels closely."
     },
@@ -299,7 +299,7 @@
         "gene": "DPYD",
         "phenotype": "IM",
         "drug": "FLUOROURACIL",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "critical",
         "recommendation": "Reduce fluorouracil/capecitabine dose by 50%. Intermediate DPD activity increases risk of severe and potentially fatal toxicity (mucositis, myelosuppression)."
     },
@@ -323,7 +323,7 @@
         "gene": "DPYD",
         "phenotype": "IM",
         "drug": "CAPECITABINE",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "critical",
         "recommendation": "Reduce capecitabine dose by 50%. Intermediate DPD activity — risk of severe toxicity."
     },
@@ -347,9 +347,9 @@
         "gene": "TPMT",
         "phenotype": "IM",
         "drug": "AZATHIOPRINE",
-        "risk_label": "Adjust",
-        "severity": "high",
-        "recommendation": "Reduce azathioprine dose by 30-80%. IM patients accumulate cytotoxic thioguanine nucleotides — risk of myelosuppression. Monitor CBC."
+        "risk_label": "Adjust Dosage",
+        "severity": "moderate",
+        "recommendation": "Reduce azathioprine starting dose by 30-70%. IM patients have one functional TPMT copy — moderate risk of myelosuppression. Monitor CBC. CPIC Level A."
     },
     {
         "gene": "TPMT",
@@ -371,9 +371,9 @@
         "gene": "TPMT",
         "phenotype": "IM",
         "drug": "MERCAPTOPURINE",
-        "risk_label": "Adjust",
-        "severity": "high",
-        "recommendation": "Reduce mercaptopurine dose by 30-80%. Monitor CBC for myelosuppression."
+        "risk_label": "Adjust Dosage",
+        "severity": "moderate",
+        "recommendation": "Reduce mercaptopurine dose by 30-70%. IM patients have one functional TPMT copy. Monitor CBC for myelosuppression. CPIC Level A."
     },
     {
         "gene": "TPMT",
@@ -387,7 +387,7 @@
         "gene": "CYP3A5",
         "phenotype": "EM",
         "drug": "TACROLIMUS",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "high",
         "recommendation": "CYP3A5 expressors require HIGHER tacrolimus doses (1.5-2x standard) to achieve target trough concentrations. Increase starting dose and monitor levels."
     },
@@ -395,7 +395,7 @@
         "gene": "CYP3A5",
         "phenotype": "IM",
         "drug": "TACROLIMUS",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "moderate",
         "recommendation": "May require modestly increased tacrolimus dose. Monitor trough levels closely."
     },
@@ -419,9 +419,9 @@
         "gene": "SLCO1B1",
         "phenotype": "DF",
         "drug": "SIMVASTATIN",
-        "risk_label": "Adjust",
-        "severity": "high",
-        "recommendation": "Use lower dose simvastatin (max 20mg) or switch to pravastatin/rosuvastatin. Decreased OATP1B1 function increases systemic statin exposure and myopathy risk."
+        "risk_label": "Adjust Dosage",
+        "severity": "moderate",
+        "recommendation": "Use lower dose simvastatin (max 20mg) or switch to pravastatin/rosuvastatin. Heterozygous decreased OATP1B1 function increases systemic statin exposure and moderate myopathy risk. CPIC Level A."
     },
     {
         "gene": "SLCO1B1",
@@ -443,7 +443,7 @@
         "gene": "SLCO1B1",
         "phenotype": "DF",
         "drug": "ATORVASTATIN",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "moderate",
         "recommendation": "Consider lower atorvastatin dose or alternative statin. Monitor for muscle symptoms."
     },
@@ -451,7 +451,7 @@
         "gene": "SLCO1B1",
         "phenotype": "PF",
         "drug": "ATORVASTATIN",
-        "risk_label": "Adjust",
+        "risk_label": "Adjust Dosage",
         "severity": "high",
         "recommendation": "Use lower atorvastatin dose or switch to pravastatin/rosuvastatin. Increased myopathy risk."
     }

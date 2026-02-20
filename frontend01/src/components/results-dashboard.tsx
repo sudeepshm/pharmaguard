@@ -3,32 +3,40 @@
 import { useState, useEffect, useRef } from "react";
 import {
     CheckCircle2, XCircle, AlertTriangle, HelpCircle,
-    ChevronDown, ChevronUp, Copy, Download, Code2,
+    ChevronRight, Copy, Download, Code2,
     Dna, Pill, Shield, ShieldAlert, ShieldX, ShieldCheck,
-    Activity, Beaker,
+    Activity, ExternalLink,
 } from "lucide-react";
 import { cn, type DrugResult, type RiskLabel } from "@/lib/utils";
 
-/* ── Risk Visual Config ───────────────────────── */
-const RISK_CONFIG: Record<RiskLabel, {
-    color: string; bg: string; border: string;
-    icon: typeof CheckCircle2; label: string;
-}> = {
-    Safe: { color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/25", icon: ShieldCheck, label: "Safe" },
-    Adjust: { color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/25", icon: ShieldAlert, label: "Adjust Dosage" },
-    Toxic: { color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/25", icon: ShieldX, label: "Toxic Risk" },
-    Ineffective: { color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/25", icon: XCircle, label: "Ineffective" },
-    Unknown: { color: "text-slate-400", bg: "bg-slate-500/10", border: "border-slate-500/25", icon: HelpCircle, label: "Unknown" },
+/* ═══════════════════════════════════════════════════════
+   RISK CONFIG
+   ═══════════════════════════════════════════════════════ */
+type RiskConfig = {
+    badgeClass: string;
+    color: string;
+    dotColor: string;
+    label: string;
+    icon: typeof ShieldCheck;
+    glowShadow?: string;
 };
 
-const SEVERITY_COLORS: Record<string, string> = {
-    critical: "text-red-400",
-    high: "text-orange-400",
-    moderate: "text-amber-400",
-    low: "text-green-400",
+const RISK_CONFIG: Record<RiskLabel, RiskConfig> = {
+    Safe: { badgeClass: "risk-badge--safe", color: "#34d399", dotColor: "bg-green-400", label: "SAFE", icon: ShieldCheck },
+    "Adjust Dosage": { badgeClass: "risk-badge--adjust", color: "#fbbf24", dotColor: "bg-amber-400", label: "ADJUST DOSAGE", icon: ShieldAlert },
+    Toxic: { badgeClass: "risk-badge--toxic", color: "#fb7185", dotColor: "bg-rose-400", label: "TOXIC", icon: ShieldX, glowShadow: "var(--shadow-glow-danger)" },
+    Ineffective: { badgeClass: "risk-badge--ineffective", color: "#a78bfa", dotColor: "bg-violet-400", label: "INEFFECTIVE", icon: XCircle },
+    Unknown: { badgeClass: "risk-badge--unknown", color: "#94a3b8", dotColor: "bg-slate-400", label: "UNKNOWN", icon: HelpCircle },
 };
 
-/* ── Typewriter Hook ─────────────────────────── */
+const SEVERITY_LEVELS = ["none", "low", "moderate", "high", "critical"] as const;
+const SEVERITY_INDEX: Record<string, number> = {
+    none: 0, low: 1, moderate: 2, high: 3, critical: 4,
+};
+
+/* ═══════════════════════════════════════════════════════
+   TYPEWRITER HOOK (preserved from original)
+   ═══════════════════════════════════════════════════════ */
 function useTypewriter(text: string, speed: number = 12) {
     const [displayed, setDisplayed] = useState("");
     const [done, setDone] = useState(false);
@@ -36,6 +44,7 @@ function useTypewriter(text: string, speed: number = 12) {
     useEffect(() => {
         setDisplayed("");
         setDone(false);
+        if (!text) { setDone(true); return; }
         let i = 0;
         const interval = setInterval(() => {
             i++;
@@ -51,22 +60,100 @@ function useTypewriter(text: string, speed: number = 12) {
     return { displayed, done };
 }
 
-/* ── Single Result Card ──────────────────────── */
+/* ═══════════════════════════════════════════════════════
+   COLLAPSIBLE SECTION
+   ═══════════════════════════════════════════════════════ */
+function CollapsibleSection({
+    title, defaultOpen = false, children,
+}: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+    const [open, setOpen] = useState(defaultOpen);
+    const contentRef = useRef<HTMLDivElement>(null);
+
+    return (
+        <div className="border-b border-[var(--border-rest)] last:border-b-0">
+            <button className="expand-header" onClick={() => setOpen(!open)}>
+                <ChevronRight size={12} className={cn("chevron", open && "open")} />
+                {title}
+            </button>
+            <div
+                className="expand-content"
+                style={{
+                    maxHeight: open ? `${(contentRef.current?.scrollHeight || 500) + 16}px` : "0px",
+                    opacity: open ? 1 : 0,
+                    paddingBottom: open ? "12px" : "0px",
+                }}
+            >
+                <div ref={contentRef}>{children}</div>
+            </div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════
+   CONFIDENCE BAR + SEVERITY DOTS
+   ═══════════════════════════════════════════════════════ */
+function ConfidenceBar({ score, color }: { score: number; color: string }) {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { const t = setTimeout(() => setMounted(true), 100); return () => clearTimeout(t); }, []);
+
+    return (
+        <div>
+            <div className="text-[9px] text-[var(--text-low)] uppercase tracking-[0.12em] mb-1">Confidence</div>
+            <div className="font-mono text-[28px] font-bold text-[var(--text-high)] leading-none mb-2">
+                {(score * 100).toFixed(0)}%
+            </div>
+            <div className="confidence-bar">
+                <div
+                    className="confidence-fill"
+                    style={{
+                        width: mounted ? `${score * 100}%` : "0%",
+                        background: `linear-gradient(90deg, ${color}66, ${color})`,
+                    }}
+                />
+            </div>
+        </div>
+    );
+}
+
+function SeverityDots({ severity, color }: { severity: string; color: string }) {
+    const activeIdx = SEVERITY_INDEX[severity.toLowerCase()] ?? 0;
+
+    return (
+        <div>
+            <div className="text-[9px] text-[var(--text-low)] uppercase tracking-[0.12em] mb-2">Severity</div>
+            <div className="flex items-center gap-1">
+                {SEVERITY_LEVELS.map((level, i) => (
+                    <div
+                        key={level}
+                        className={cn("severity-dot", i <= activeIdx && "active")}
+                        title={level}
+                        style={{
+                            background: i <= activeIdx ? color : undefined,
+                            boxShadow: i <= activeIdx ? `0 0 8px ${color}44` : undefined,
+                            transitionDelay: `${i * 60 + 300}ms`,
+                        }}
+                    />
+                ))}
+            </div>
+            <div className="text-[9px] text-[var(--text-low)] mt-1 capitalize">{severity}</div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESULT CARD
+   ═══════════════════════════════════════════════════════ */
 function ResultCard({ result, index }: { result: DrugResult; index: number }) {
-    const [expanded, setExpanded] = useState(false);
-    const [showJSON, setShowJSON] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [showJSON, setShowJSON] = useState(false);
 
     const risk = result.risk_assessment;
     const config = RISK_CONFIG[risk.risk_label as RiskLabel] || RISK_CONFIG.Unknown;
-    const Icon = config.icon;
+    const profile = result.pharmacogenomic_profile;
 
     const summary = result.llm_generated_explanation?.summary || "";
     const mechanism = result.llm_generated_explanation?.mechanism || "";
     const { displayed: typedSummary, done: summaryDone } = useTypewriter(summary, 8);
-    const { displayed: typedMechanism } = useTypewriter(
-        expanded && summaryDone ? mechanism : "", 6
-    );
 
     const copyJSON = () => {
         navigator.clipboard.writeText(JSON.stringify(result, null, 2));
@@ -84,159 +171,189 @@ function ResultCard({ result, index }: { result: DrugResult; index: number }) {
         URL.revokeObjectURL(url);
     };
 
+    const effectColor = (effect: string) => {
+        const e = effect.toLowerCase();
+        if (e.includes("no function") || e.includes("loss")) return "text-[var(--rose)]";
+        if (e.includes("reduced") || e.includes("decreased")) return "text-[var(--amber)]";
+        if (e.includes("normal") || e.includes("increased")) return "text-[var(--emerald)]";
+        return "text-[var(--text-mid)]";
+    };
+
     return (
         <div
-            className={cn(
-                "rounded-2xl border overflow-hidden transition-all duration-300",
-                "animate-fade-in-up",
-                config.border, config.bg
-            )}
-            style={{ animationDelay: `${index * 100}ms` }}
+            className="animate-fade-in-up space-y-3"
+            style={{ animationDelay: `${80 + index * 80}ms` }}
         >
-            {/* Header */}
-            <div className="px-5 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    {/* Risk Icon */}
-                    <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center", config.bg, "border", config.border)}>
-                        <Icon size={22} className={config.color} />
+            {/* ── Risk Assessment Card ─────────────── */}
+            <div
+                className="clinical-card !p-0 overflow-hidden"
+                style={{ boxShadow: config.glowShadow || "var(--shadow-card)" }}
+            >
+                <div className="flex flex-col sm:flex-row">
+                    {/* Left: drug + risk badge */}
+                    <div className="flex-[3] p-5">
+                        <h3
+                            className="text-[var(--text-high)] font-bold leading-none mb-3"
+                            style={{ fontSize: "clamp(18px, 2.5vw, 28px)", letterSpacing: "-0.01em" }}
+                        >
+                            {result.drug}
+                        </h3>
+                        <span className={cn("risk-badge", config.badgeClass)} style={{ animationDelay: `${200 + index * 80}ms` }}>
+                            {config.label}
+                        </span>
+                        <p className="text-[12px] text-[var(--text-mid)] mt-3">
+                            {profile.phenotype} · <span className="font-mono font-semibold">{profile.diplotype}</span>
+                        </p>
                     </div>
 
-                    {/* Drug + Gene */}
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <Pill size={14} className="text-[var(--accent-purple)]" />
-                            <h3 className="text-base font-bold text-[var(--text-primary)]">{result.drug}</h3>
-                            <span className={cn("px-2 py-0.5 rounded-md text-xs font-bold", config.bg, config.color, "border", config.border)}>
-                                {config.label}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1">
-                            <span className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-                                <Dna size={12} className="text-[var(--accent-cyan)]" />
-                                {result.pharmacogenomic_profile.primary_gene}
-                            </span>
-                            <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-[var(--accent-cyan)]/10 text-[var(--accent-cyan)] border border-[var(--accent-cyan)]/20">
-                                {result.pharmacogenomic_profile.diplotype}
-                            </span>
-                            <span className="text-xs text-[var(--text-muted)]">
-                                {result.pharmacogenomic_profile.phenotype}
-                            </span>
-                        </div>
+                    {/* Right: confidence + severity */}
+                    <div className="flex-[2] p-5 border-t sm:border-t-0 sm:border-l border-[var(--border-rest)] flex flex-col justify-center gap-4">
+                        <ConfidenceBar score={risk.confidence_score} color={config.color} />
+                        <SeverityDots severity={risk.severity} color={config.color} />
                     </div>
-                </div>
-
-                {/* Confidence + Severity */}
-                <div className="flex items-center gap-3">
-                    <div className="text-right">
-                        <div className="flex items-center gap-1">
-                            <Activity size={12} className={SEVERITY_COLORS[risk.severity] || "text-slate-400"} />
-                            <span className={cn("text-xs font-semibold uppercase", SEVERITY_COLORS[risk.severity] || "text-slate-400")}>
-                                {risk.severity}
-                            </span>
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                            {(risk.confidence_score * 100).toFixed(0)}% confidence
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => setExpanded(!expanded)}
-                        className="p-2 rounded-lg hover:bg-white/5 transition-colors"
-                        aria-label={expanded ? "Collapse" : "Expand"}
-                    >
-                        {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    </button>
                 </div>
             </div>
 
-            {/* AI Summary (always visible, typewriter effect) */}
-            <div className="px-5 pb-3">
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                    {typedSummary}
-                    {!summaryDone && <span className="inline-block w-0.5 h-4 bg-[var(--accent-blue)] animate-pulse ml-0.5 align-middle" />}
+            {/* ── Pharmacogenomic Profile ──────────── */}
+            <div className="clinical-card">
+                <div className="section-label">Pharmacogenomic Profile</div>
+                <div className="data-grid">
+                    <span className="label">Primary Gene</span>
+                    <span className="value">{profile.primary_gene}</span>
+                    <span className="label">Diplotype</span>
+                    <span className="value">{profile.diplotype}</span>
+                    <span className="label">Phenotype</span>
+                    <span className="value">{profile.phenotype}</span>
+                </div>
+            </div>
+
+            {/* ── Detected Variants Table ─────────── */}
+            {profile.detected_variants && profile.detected_variants.length > 0 && (
+                <div className="clinical-card !p-0 overflow-hidden">
+                    <div className="p-5 pb-0"><div className="section-label">Detected Variants</div></div>
+                    <div className="overflow-x-auto">
+                        <table className="variant-table">
+                            <thead>
+                                <tr>
+                                    <th>RSID</th>
+                                    <th>Genotype</th>
+                                    <th>Effect</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {profile.detected_variants.map((v, vi) => (
+                                    <tr
+                                        key={vi}
+                                        className="animate-fade-in-up"
+                                        style={{ animationDelay: `${300 + vi * 30}ms` }}
+                                    >
+                                        <td className="font-bold text-[var(--cyan)]">{v.rsid}</td>
+                                        <td>{v.genotype || "N/A"}</td>
+                                        <td className={effectColor(v.effect || "")}>
+                                            {v.effect || "—"}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Clinical Recommendation ─────────── */}
+            <div
+                className="clinical-card"
+                style={{ borderLeft: `3px solid ${config.color}` }}
+            >
+                <div className="section-label">Clinical Recommendation</div>
+                <p className="text-[13px] text-[var(--text-high)] leading-[1.7]">
+                    {summary ? typedSummary : "No clinical recommendation available."}
+                    {!summaryDone && summary && (
+                        <span className="inline-block w-0.5 h-4 bg-[var(--cyan)] animate-pulse ml-0.5 align-middle" />
+                    )}
+                </p>
+                {risk.risk_label === "Adjust Dosage" && (
+                    <div className="mt-3 font-mono text-[11px] text-[var(--amber)] bg-[rgba(245,158,11,0.04)] border border-[rgba(245,158,11,0.15)] rounded-[var(--r-sm)] px-3.5 py-2.5">
+                        Recommended dose adjustment · CPIC Level A
+                    </div>
+                )}
+                <p className="mt-3 text-[11px] text-[var(--text-low)] flex items-center gap-1 hover:text-[var(--cyan)] transition-colors cursor-pointer">
+                    CPIC Guideline: {profile.primary_gene} ({new Date().getFullYear()})
+                    <ExternalLink size={10} />
                 </p>
             </div>
 
-            {/* Expanded Content */}
-            {expanded && (
-                <div className="px-5 pb-5 space-y-4 border-t border-white/5 pt-4">
-                    {/* Mechanism */}
-                    {mechanism && (
-                        <div>
-                            <h4 className="text-xs font-semibold uppercase text-[var(--accent-purple)] mb-2 flex items-center gap-1.5">
-                                <Beaker size={12} /> Biological Mechanism
-                            </h4>
-                            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                                {typedMechanism}
-                                {typedMechanism.length < mechanism.length && (
-                                    <span className="inline-block w-0.5 h-4 bg-[var(--accent-purple)] animate-pulse ml-0.5 align-middle" />
-                                )}
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Detected Variants */}
-                    {result.detected_variants.length > 0 && (
-                        <div>
-                            <h4 className="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2">
-                                Detected Variants ({result.detected_variants.length})
-                            </h4>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                {result.detected_variants.map((v, i) => (
-                                    <div key={i} className="px-3 py-2 rounded-lg bg-white/3 border border-white/5 text-xs">
-                                        <span className="font-mono font-bold text-[var(--accent-cyan)]">{v.rsid}</span>
-                                        <span className="text-[var(--text-muted)] ml-2">{v.genotype || "N/A"}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 pt-2">
-                        <button
-                            onClick={copyJSON}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-                        >
-                            <Copy size={12} />
-                            {copied ? "Copied!" : "Copy JSON"}
-                        </button>
-                        <button
-                            onClick={downloadJSON}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-                        >
-                            <Download size={12} />
-                            Download
-                        </button>
-                        <button
-                            onClick={() => setShowJSON(!showJSON)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-                        >
-                            <Code2 size={12} />
-                            {showJSON ? "Hide" : "View"} Raw JSON
-                        </button>
-                    </div>
-
-                    {/* Raw JSON */}
-                    {showJSON && (
-                        <pre className="p-4 rounded-xl bg-black/30 border border-white/5 text-xs font-mono text-[var(--accent-cyan)] overflow-x-auto max-h-80">
-                            {JSON.stringify(result, null, 2)}
-                        </pre>
-                    )}
+            {/* ── LLM Explanation ─────────────────── */}
+            <div className="clinical-card">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="section-label !mb-0">AI-Generated Clinical Explanation</div>
+                    <span className="nav-pill nav-pill--teal text-[8px]">● Powered by LLM</span>
                 </div>
+
+                <CollapsibleSection title="Summary" defaultOpen>
+                    <p className="text-[13px] text-[var(--text-mid)] leading-[1.75]">
+                        {summary || "No summary available."}
+                    </p>
+                </CollapsibleSection>
+
+                {mechanism && (
+                    <CollapsibleSection title="Biological Mechanism">
+                        <p className="text-[13px] text-[var(--text-mid)] leading-[1.75]">
+                            {mechanism}
+                        </p>
+                    </CollapsibleSection>
+                )}
+
+                {profile.detected_variants && profile.detected_variants.length > 0 && (
+                    <CollapsibleSection title="Variant Citations">
+                        <div className="flex flex-wrap gap-1.5">
+                            {profile.detected_variants.map((v, i) => (
+                                <span key={i} className="font-mono text-[10px] text-[var(--cyan)] bg-[rgba(14,165,233,0.06)] border border-[rgba(14,165,233,0.12)] rounded-[var(--r-sm)] px-2 py-0.5">
+                                    {v.rsid}
+                                </span>
+                            ))}
+                        </div>
+                    </CollapsibleSection>
+                )}
+            </div>
+
+            {/* ── Actions ─────────────────────────── */}
+            <div className="flex items-center gap-2">
+                <button onClick={copyJSON} className="action-btn action-btn--primary">
+                    {copied ? <>✓ Copied</> : <><Copy size={11} /> Copy JSON</>}
+                </button>
+                <button onClick={downloadJSON} className="action-btn action-btn--primary">
+                    <Download size={11} /> Download JSON
+                </button>
+                <button onClick={() => setShowJSON(!showJSON)} className="action-btn action-btn--ghost">
+                    <Code2 size={11} /> {showJSON ? "Hide" : "View"} Raw
+                </button>
+            </div>
+
+            {showJSON && (
+                <pre className="p-4 rounded-[var(--r-md)] bg-[var(--bg-elevated)] border border-[var(--border-rest)] text-xs font-mono text-[var(--cyan)] overflow-x-auto max-h-80">
+                    {JSON.stringify(result, null, 2)}
+                </pre>
             )}
         </div>
     );
 }
 
-/* ── Dashboard ───────────────────────────────── */
+/* ═══════════════════════════════════════════════════════
+   DASHBOARD
+   ═══════════════════════════════════════════════════════ */
 interface ResultsDashboardProps {
     results: DrugResult[];
     patientId: string;
+    runId?: string;
 }
 
-export default function ResultsDashboard({ results, patientId }: ResultsDashboardProps) {
+export default function ResultsDashboard({ results, patientId, runId }: ResultsDashboardProps) {
+    const [activeTab, setActiveTab] = useState(0);
+    const showTabs = results.length > 1;
+
     const safeCount = results.filter((r) => r.risk_assessment.risk_label === "Safe").length;
-    const adjustCount = results.filter((r) => r.risk_assessment.risk_label === "Adjust").length;
+    const adjustCount = results.filter((r) => r.risk_assessment.risk_label === "Adjust Dosage").length;
     const dangerCount = results.filter((r) =>
         r.risk_assessment.risk_label === "Toxic" || r.risk_assessment.risk_label === "Ineffective"
     ).length;
@@ -251,47 +368,82 @@ export default function ResultsDashboard({ results, patientId }: ResultsDashboar
         URL.revokeObjectURL(url);
     };
 
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const timeStr = now.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
     return (
-        <div className="space-y-6">
-            {/* Summary Bar */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-xl font-bold text-[var(--text-primary)]">
-                        Analysis Results
-                    </h2>
-                    <div className="flex items-center gap-2">
-                        {safeCount > 0 && (
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-500/10 text-green-400 border border-green-500/20">
-                                {safeCount} Safe
-                            </span>
-                        )}
-                        {adjustCount > 0 && (
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                {adjustCount} Adjust
-                            </span>
-                        )}
-                        {dangerCount > 0 && (
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20">
-                                {dangerCount} Risk
-                            </span>
-                        )}
-                    </div>
+        <div className="space-y-4">
+            {/* ── Results Header ──────────────────── */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                    <p className="text-[11px] font-semibold text-[var(--emerald)] tracking-[0.15em] flex items-center gap-1.5 mb-1">
+                        ✓ ANALYSIS COMPLETE
+                    </p>
+                    <p className="font-mono text-[10px] text-[var(--text-low)]">
+                        {patientId} · Run {runId || "PGX-RUN-0000"} · {dateStr} {timeStr}
+                    </p>
                 </div>
-                <button
-                    onClick={downloadAll}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 hover:bg-[var(--accent-blue)]/20 transition-colors"
-                >
-                    <Download size={14} />
-                    Download Full Report
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={downloadAll} className="action-btn action-btn--primary">
+                        <Download size={11} /> Download JSON
+                    </button>
+                </div>
             </div>
 
-            {/* Result Cards */}
-            <div className="space-y-4">
-                {results.map((result, i) => (
-                    <ResultCard key={`${result.drug}-${i}`} result={result} index={i} />
-                ))}
+            {/* ── Summary counts ──────────────────── */}
+            <div className="flex items-center gap-2">
+                {safeCount > 0 && (
+                    <span className="risk-badge risk-badge--safe !text-[10px] !py-1 !px-3 !font-semibold !tracking-[0.06em]" style={{ animation: "none" }}>
+                        {safeCount} Safe
+                    </span>
+                )}
+                {adjustCount > 0 && (
+                    <span className="risk-badge risk-badge--adjust !text-[10px] !py-1 !px-3 !font-semibold !tracking-[0.06em]" style={{ animation: "none" }}>
+                        {adjustCount} Adjust
+                    </span>
+                )}
+                {dangerCount > 0 && (
+                    <span className="risk-badge risk-badge--toxic !text-[10px] !py-1 !px-3 !font-semibold !tracking-[0.06em]" style={{ animation: "none" }}>
+                        {dangerCount} Risk
+                    </span>
+                )}
             </div>
+
+            {/* ── Drug Tabs (multi-drug only) ─────── */}
+            {showTabs && (
+                <div className="flex items-center border-b border-[var(--border-rest)] gap-0">
+                    {results.map((r, i) => {
+                        const riskCfg = RISK_CONFIG[r.risk_assessment.risk_label as RiskLabel] || RISK_CONFIG.Unknown;
+                        return (
+                            <button
+                                key={`${r.drug}-${i}`}
+                                onClick={() => setActiveTab(i)}
+                                className={cn("drug-tab flex items-center gap-2", i === activeTab && "active")}
+                            >
+                                <span
+                                    className="w-[6px] h-[6px] rounded-full"
+                                    style={{ background: riskCfg.color }}
+                                />
+                                {r.drug}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* ── Result Cards ────────────────────── */}
+            {showTabs ? (
+                <div key={activeTab} style={{ animation: "fadeInUp 150ms ease-out" }}>
+                    <ResultCard result={results[activeTab]} index={0} />
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {results.map((result, i) => (
+                        <ResultCard key={`${result.drug}-${i}`} result={result} index={i} />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

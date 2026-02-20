@@ -17,13 +17,12 @@ export const KNOWN_DRUGS = [
   "SIMVASTATIN", "ATORVASTATIN", "ROSUVASTATIN",
 ];
 
-export type RiskLabel = "Safe" | "Adjust" | "Toxic" | "Ineffective" | "Unknown";
+export type RiskLabel = "Safe" | "Adjust Dosage" | "Toxic" | "Ineffective" | "Unknown";
 
 export interface DetectedVariant {
   rsid: string;
   genotype: string | null;
-  allelic_depth: string | null;
-  clinical_recommendation: string;
+  effect: string | null;
 }
 
 export interface RiskAssessment {
@@ -36,6 +35,14 @@ export interface PharmacogenomicProfile {
   primary_gene: string;
   diplotype: string;
   phenotype: string;
+  detected_variants: DetectedVariant[];
+}
+
+export interface ClinicalRecommendation {
+  recommendation: string;
+  dosing_guidance: string | null;
+  cpic_guideline: string | null;
+  cpic_level: string | null;
 }
 
 export interface LLMExplanation {
@@ -50,12 +57,12 @@ export interface QualityMetrics {
 }
 
 export interface DrugResult {
-  "patient id": string;
+  patient_id: string;
   drug: string;
   timestamp: string;
   risk_assessment: RiskAssessment;
   pharmacogenomic_profile: PharmacogenomicProfile;
-  detected_variants: DetectedVariant[];
+  clinical_recommendation: ClinicalRecommendation;
   llm_generated_explanation: LLMExplanation;
   quality_metrics: QualityMetrics;
 }
